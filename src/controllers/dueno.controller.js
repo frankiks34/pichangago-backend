@@ -97,38 +97,51 @@ const registrarCancha = async (req, res, appPool) => {
     }
 };
 
-// D-05: Editar Información de la Cancha
 const editarCancha = async (req, res, appPool) => {
     const { idCancha } = req.params;
     const { nombre, descripcion, precioBase, precioPrime, precioBaja } = req.body;
 
     try {
+        // 1. Usamos appPool para no asfixiar la Base de Datos
         const idDueno = await obtenerIdDueno(req.user.id, appPool);
 
+        // 2. Seguridad: Asegurar que la cancha pertenece a este dueño antes de editar
         const verify = await new sql.Request(appPool)
             .input('id_cancha', sql.Char(10), idCancha)
             .input('id_dueño', sql.Char(10), idDueno)
+            .query('SELECT ID_Cancha FROM Canchas WHERE ID_Cancha = @id_cancha AND ID_Dueño = @id_dueño');
+
+        if (verify.recordset.length === 0) {
+            return res.status(403).json({ status: 'error', error: 'No autorizado para editar esta cancha.' });
+        }
+
+        // 3. El UPDATE correcto (quitando 'distrito' porque eso le pertenece a la tabla Local)
+        await new sql.Request(appPool)
+            .input('id_cancha', sql.Char(10), idCancha)
             .input('nombre', sql.VarChar(50), nombre)
-            .input('descripcion', sql.VarChar(150), descripcion)
-            .input('distrito', sql.VarChar(50), distrito)
+            .input('descripcion', sql.VarChar(150), descripcion || '')
             .input('precio_base', sql.Decimal(10, 2), precioBase)
             .input('precio_prime', sql.Decimal(10, 2), precioPrime || precioBase)
             .input('precio_baja', sql.Decimal(10, 2), precioBaja || precioBase)
-            .input('estado', sql.VarChar(20), 'DISPONIBLE') // Estado operativo inicial
-            .input('fecha_crea', sql.Date, new Date())
             .query(`
-                INSERT INTO Canchas (ID_Cancha, ID_Dueño, Nombre, Descripcion, Distrito, Precio_Base, Precio_Prime, Precio_Baja, Estado, Fecha_Crea)
-                VALUES (@id_cancha, @id_dueño, @nombre, @descripcion, @distrito, @precio_base, @precio_prime, @precio_baja, @estado, @fecha_crea)
+                UPDATE Canchas 
+                SET Nombre = @nombre, 
+                    Descripcion = @descripcion, 
+                    Precio_Base = @precio_base, 
+                    Precio_Prime = @precio_prime, 
+                    Precio_Baja = @precio_baja
+                WHERE ID_Cancha = @id_cancha
             `);
 
-        res.status(201).json({ status: 'success', mensaje: 'Cancha registrada.', idCancha });
+        res.status(200).json({ status: 'success', mensaje: 'Información de la cancha actualizada.' });
     } catch (error) {
-        if (error.message === 'DUEÑO_NOT_FOUND') return res.status(404).json({ status: 'error', error: 'Perfil de dueño no encontrado.' });
-        console.error('🚨 Error en editarLocal:', error);
-        res.status(500).json({ status: 'error', error: 'Error interno al actualizar el local.' });
+        if (error.message === 'DUEÑO_NOT_FOUND') {
+            return res.status(404).json({ status: 'error', error: 'Perfil de dueño no encontrado.' });
+        }
+        console.error('🚨 Error en editarCancha:', error);
+        res.status(500).json({ status: 'error', error: 'Error interno al actualizar la cancha.' });
     }
 };
-
 // Listar locales del dueño (con sus canchas)
 const obtenerMisLocales = async (req, res, appPool) => {
     const idUser = req.user.id;
@@ -400,44 +413,7 @@ const actualizarPerfilFinanciero = async (req, res) => {
     }
 };
 
-// D-05: Editar Información de la Cancha
-const editarCancha = async (req, res) => {
-    const { idCancha } = req.params;
-    const { nombre, descripcion, distrito, precioBase, precioPrime, precioBaja } = req.body;
 
-    try {
-        const idDueno = await obtenerIdDueno(req.user.id);
-
-        // Seguridad: Asegurar que la cancha pertenece a este dueño antes de editar
-        const verify = await new sql.Request()
-            .input('id_cancha', sql.Char(10), idCancha)
-            .input('id_dueño', sql.Char(10), idDueno)
-            .query('SELECT ID_Cancha FROM Canchas WHERE ID_Cancha = @id_cancha AND ID_Dueño = @id_dueño');
-
-        if (verify.recordset.length === 0) {
-            return res.status(403).json({ error: 'No autorizado para editar esta cancha.' });
-        }
-
-        await new sql.Request()
-            .input('id_cancha', sql.Char(10), idCancha)
-            .input('nombre', sql.VarChar(50), nombre)
-            .input('descripcion', sql.VarChar(150), descripcion)
-            .input('distrito', sql.VarChar(50), distrito)
-            .input('precio_base', sql.Decimal(10, 2), precioBase)
-            .input('precio_prime', sql.Decimal(10, 2), precioPrime)
-            .input('precio_baja', sql.Decimal(10, 2), precioBaja)
-            .query(`
-                UPDATE Canchas 
-                SET Nombre = @nombre, Descripcion = @descripcion, Distrito = @distrito, 
-                    Precio_Base = @precio_base, Precio_Prime = @precio_prime, Precio_Baja = @precio_baja
-                WHERE ID_Cancha = @id_cancha
-            `);
-
-        res.status(200).json({ status: 'success', mensaje: 'Información de la cancha actualizada.' });
-    } catch (error) {
-        res.status(500).json({ error: 'Error interno al actualizar la cancha.' });
-    }
-};
 
 // D-06: Suspender / Reactivar la Cancha (Borrado Lógico)
 const cambiarEstadoCancha = async (req, res) => {
