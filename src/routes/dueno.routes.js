@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const duenoController = require('../controllers/dueno.controller');
-<<<<<<< HEAD
-=======
 const negocioController = require('../controllers/negocio.controller');
 const { verificarRol } = require('../middleware/roleMiddleware');
 const upload = require('../middleware/upload');
 const {
-    canchaRules, localRules, perfilFinancieroRules, horarioRules,
-    estadoCanchaRules, estadoSlotRules, ofertaRules, updateProfileRules
+  canchaRules, localRules, perfilFinancieroRules, horarioRules,
+  estadoCanchaRules, estadoSlotRules, ofertaRules, updateProfileRules
 } = require('../middleware/validators');
 
 // Recibimos tanto el middleware como el pool de conexiones activo de la BD
 module.exports = (verificarToken, appPool) => {
+    // Middleware de doble validación: Token Válido + Rol de Dueño
     const auth = [verificarToken, verificarRol('DUENO', 'DUEÑO')];
 
     // Feature 0: Gestión de Locales
@@ -20,19 +19,13 @@ module.exports = (verificarToken, appPool) => {
     router.get('/locales', ...auth, (req, res) => duenoController.obtenerMisLocales(req, res, appPool));
     router.get('/locales/:idLocal', ...auth, (req, res) => duenoController.obtenerLocalPorId(req, res, appPool));
     router.put('/locales/:idLocal', ...auth, localRules, (req, res) => duenoController.editarLocal(req, res, appPool));
->>>>>>> feature/gestion-dueno
 
-module.exports = (verificarToken) => {
-    
     // Feature 1: Mantenimiento de Canchas
-    router.post('/canchas', verificarToken, duenoController.registrarCancha);
-    router.put('/canchas/:idCancha', verificarToken, duenoController.editarCancha);
-    router.patch('/canchas/:idCancha/estado', verificarToken, duenoController.cambiarEstadoCancha);
+    // Nota: Aquí tu compañero usa 'upload.single' si sube fotos
+    router.post('/canchas', ...auth, (req, res) => duenoController.registrarCancha(req, res, appPool));
+    router.put('/canchas/:idCancha', ...auth, (req, res) => duenoController.editarCancha(req, res, appPool));
+    router.patch('/canchas/:idCancha/estado', ...auth, (req, res) => duenoController.cambiarEstadoCancha(req, res, appPool));
 
-<<<<<<< HEAD
-    // Feature 2: Configuración Financiera
-    router.put('/perfil-financiero', verificarToken, duenoController.actualizarPerfilFinanciero);
-=======
     // Feature 2: Perfil de Usuario y Configuración Financiera
     router.get('/perfil', ...auth, (req, res) => duenoController.obtenerPerfil(req, res, appPool));
     router.put('/perfil', ...auth, updateProfileRules, (req, res) => duenoController.actualizarPerfil(req, res, appPool));
@@ -58,7 +51,6 @@ module.exports = (verificarToken) => {
     router.get('/reportes/saldo-pendiente', ...auth, (req, res) => negocioController.obtenerSaldoPendiente(req, res, appPool));
     router.get('/reportes/liquidaciones', ...auth, (req, res) => negocioController.obtenerHistorialLiquidaciones(req, res, appPool));
     router.get('/reportes/ocupacion', ...auth, (req, res) => negocioController.obtenerEstadisticasOcupacion(req, res, appPool));
->>>>>>> feature/gestion-dueno
 
     return router;
 };
